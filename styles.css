@@ -185,6 +185,13 @@
   .dchip.cur{background:var(--dchip-on-bg); border-color:var(--dchip-on-border); color:var(--dchip-on-ink)}
   .dchip.cur::after{content:''; display:block; width:6px; height:6px; border-radius:50%;
                     background:var(--orange); margin:3px auto -2px}
+  /* 触摸设备的用法说明（给家长看的一行） */
+  .touchhint{
+    display:none; flex:0 0 auto; padding:0 4px; text-align:center;
+    font-size:13.5px; line-height:1.7; color:var(--text-muted); font-weight:600;
+  }
+  .touchhint .dot{color:var(--text-rule); margin:0 5px}
+  .touchhint b{color:var(--ink); font-weight:800}
   .hint .kbd{font-family:ui-monospace,Menlo,monospace; background:var(--dchip-bg); border:1.5px solid var(--dchip-border);
              border-radius:6px; padding:1px 6px; color:var(--cat-ink); font-size:11.5px}
 
@@ -231,17 +238,26 @@
      注意：位移必须用真正的 transform，不能用未注册的 CSS 变量——
      Chrome 对未注册变量做的是离散插值，过渡会变成瞬间跳变。 */
   .card-swipe{
-    position:relative; width:100%; max-width:620px; aspect-ratio:1/1.05; height:100%; max-height:100%;
+    position:relative; width:100%; aspect-ratio:1/1.05;
+    /* 尺寸只由「宽度 + aspect-ratio」决定：既不会长出屏幕，也让『虚线上方』接近方形。
+       放在 min() 里而不是断点里，宽屏手机（430px 这类）才会同样生效。
+       注意：这里不能再用 height:100%——它和 aspect-ratio 打架，
+       会让本层和内部绝对定位的 .card 算出不同高度（卡片会溢出压住下面的说明）。 */
+    max-width:min(92vw, 620px); max-height:100%;
     will-change:transform;
   }
   .card-swipe.spring{transition:transform .3s cubic-bezier(.2,.9,.3,1), opacity .2s ease}
   .card-swipe.leaving{transition:transform .24s cubic-bezier(.4,0,.9,.5), opacity .24s ease}
   .card-swipe.entering{transition:transform .3s cubic-bezier(.2,.9,.3,1), opacity .26s ease}
 
+  /* 卡片 + 用法说明算作一组，整体在按钮栏上方居中——
+     这样说明紧贴卡片，不再出现"卡片孤零零浮在中间、下面一大片空"的观感 */
   .stage{flex:1 1 auto; height:0; min-height:0; width:100%; max-width:780px; padding:14px 20px 0;
-         display:flex; align-items:center; justify-content:center; perspective:1400px}
+         display:flex; flex-direction:column; align-items:center; justify-content:center;
+         gap:22px; perspective:1400px}
   .card{
-    position:absolute; inset:0;
+    position:absolute; inset:0;          /* 尺寸完全由 .card-swipe 决定，这里不要再写 width/height/aspect-ratio */
+    aspect-ratio:auto; max-width:none;
     transform-style:preserve-3d; cursor:pointer;
     /* 横向滑动由 JS 处理，纵向仍交给页面滚动（手机上很关键） */
     touch-action:pan-y;
@@ -271,7 +287,7 @@
   .big{
     /* 同时看宽和高：矮窗口（横屏/小窗）下自动缩小，避免被卡片裁掉 */
     /* 手机上宽度有限，若只按 vw 算会明显偏小；改成以 vh 为主，卡片能填得更满 */
-    font-size:clamp(120px, min(54vw, 34vh), 300px); line-height:.92; font-weight:800; cursor:pointer;
+    font-size:clamp(110px, min(46vw, 29vh), 300px); line-height:.92; font-weight:800; cursor:pointer;
     max-width:100%; max-height:100%;
     font-family:"Kaiti SC","STKaiti","KaiTi","PingFang SC",serif;
     color:var(--big-ink); text-shadow:var(--big-shadow); transition:transform .15s;
@@ -279,7 +295,7 @@
   .big:active{transform:scale(.95)}
   .foot{
     flex:0 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; gap:9px;
-    padding-top:12px; border-top:3px dashed var(--hairline);
+    padding-top:10px; border-top:3px dashed var(--hairline);
   }
   .words{display:flex; flex-wrap:wrap; gap:9px; justify-content:center}
   .word{
@@ -324,7 +340,7 @@
   .btn.green{background:var(--btn-green)}   .btn.pink{background:var(--btn-pink)}
   .btn.purple{background:var(--btn-purple)}
   .btn.round{padding:15px 18px; font-size:21px}
-  .hint{width:100%; text-align:center; font-size:13px; color:var(--text-faint); margin-top:2px; letter-spacing:.4px}
+  .hint{width:100%; text-align:center; font-size:13px; color:var(--text-faint); letter-spacing:.4px}
 
   /* 小动画 */
   .pop{animation:pop .3s ease}
@@ -354,6 +370,9 @@
     .dglabel{font-size:13px}
     .dchip{font-size:23px; padding:8px 0; border-radius:13px}
     .stage{padding:6px calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left))}
+    /* 手机竖屏：原来卡片是 1:1.96（362×709）明显竖长、虚线上方偏空。
+       收成接近方形，省下的高度给底部的「用法说明」。 */
+    .card-swipe{aspect-ratio:1/1.08}      /* 尺寸统一由位移层决定，卡片本体只负责定位/翻面 */
     .face{border-radius:24px; padding:14px 12px}
     .foot{padding-top:8px; gap:7px}
     .words{gap:7px}
@@ -362,7 +381,7 @@
     .bar{padding:10px calc(12px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); gap:8px}
     .btn{font-size:15px; padding:12px 14px; border-radius:16px; box-shadow:0 4px 0 rgba(0,0,0,.14)}
     .btn.round{padding:12px 14px; font-size:18px}
-    .btn-say{display:none}       /* 正面大字本身可点读，手机上省略这个按钮 */
+    /* 「听一听」在手机上保留：卡片现在只负责翻面，朗读靠这个按钮 */
     .btn-txt{display:none}       /* 窄屏只留图标，避免换行溢出 */
     .backchar{font-size:38px; top:10px; left:14px}
     .backtag{top:12px; right:14px; font-size:11px; padding:4px 9px}
@@ -370,10 +389,11 @@
   /* 触摸设备（手机/平板）没有键盘，快捷键提示没有意义，直接不显示；
      同时把「左右翻页键」换成整卡滑动，按钮排成整齐的两行 */
   @media (pointer: coarse), (max-width:560px){
-    .hint{display:none}
+    .hint{display:none}                      /* 电脑键盘提示，触摸设备不显示 */
+    .touchhint{display:block}                /* 换成给家长看的用法说明 */
     .btn.round{display:none}                 /* ◀ ▶ 交给左右滑动 */
     .bar{gap:10px}
-    .btn{font-size:15.5px; padding:13px 16px}
+    .btn{font-size:15px; padding:13px 13px}
   }
   @media (max-height:700px){
     .cta{display:none}
