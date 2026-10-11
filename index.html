@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#fdf7ec" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="识字卡片" />
+<link rel="apple-touch-icon" href="icon.png" />
+<link rel="manifest" href="manifest.json" />
+<title>识字卡片 · 猜猜这是什么字</title>
+<style>
+  :root{
+    --cream:#fffdf7; --ink:#2b2b2b; --line:#e6dfd1;
+    --orange:#ff9a3c; --blue:#4fb3e8; --green:#57c98b; --pink:#ff7a9a; --purple:#9b7bf0;
+    --paper:#fff8ea;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html{ -webkit-text-size-adjust:100% }
+  html,body{height:100%}
+  body{
+    margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    background:
+      radial-gradient(1200px 700px at 12% -8%, #ffe9b8 0%, rgba(255,233,184,0) 60%),
+      radial-gradient(900px 600px at 105% 8%, #cdeaff 0%, rgba(205,234,255,0) 55%),
+      radial-gradient(900px 700px at 50% 115%, #d8ffe6 0%, rgba(216,255,230,0) 55%),
+      #fdf7ec;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--ink); overflow-x:hidden;
+    touch-action:manipulation;
+  }
+  .top{
+    width:100%; max-width:760px; padding:18px 20px 6px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .title{font-size:19px; font-weight:800; letter-spacing:1px}
+  .title small{font-weight:600; color:#a99a86; font-size:13px; letter-spacing:0; margin-left:8px}
+  .counter{font-size:15px; font-weight:800; color:#b08a4f; background:#fff3d8;
+           border:2px solid #ffe0a8; border-radius:999px; padding:6px 14px; white-space:nowrap}
+  .stage{flex:1 1 auto; min-height:0; width:100%; max-width:760px; padding:6px 20px 0;
+         display:flex; align-items:center; justify-content:center; perspective:1400px}
+  .card{
+    position:relative; width:100%; max-width:640px; aspect-ratio:1/1.06;
+    max-height:100%; transform-style:preserve-3d; transition:transform .62s cubic-bezier(.22,.9,.28,1);
+    cursor:pointer; touch-action:manipulation;
+  }
+  .card.flipped{transform:rotateY(180deg)}
+  .face{
+    position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    border-radius:34px; background:var(--paper);
+    box-shadow:0 18px 0 rgba(0,0,0,.06), 0 0 0 6px #fff, 0 0 0 10px #efe6d4, 0 22px 44px rgba(120,95,60,.18);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:26px 24px; overflow:hidden;
+  }
+  .back{transform:rotateY(180deg)}
+
+  /* ---------- 正面 ---------- */
+  .pinyin{font-family:"Times New Roman",Georgia,serif; font-size:34px; letter-spacing:2px; color:#c9922f; font-weight:700}
+  .big{
+    font-size:clamp(120px, 30vw, 230px); line-height:.98; font-weight:800; margin:2px 0 4px;
+    font-family:"Kaiti SC","STKaiti","KaiTi","PingFang SC",serif;
+    color:#222; text-shadow:0 4px 0 #f1e7d3; cursor:pointer; transition:transform .15s;
+  }
+  .big:active{transform:scale(.95)}
+  .words{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:6px}
+  .word{
+    font-size:clamp(18px,4.4vw,26px); font-weight:700; padding:8px 16px; border-radius:999px;
+    background:#fff; border:3px solid #ffe1b0; color:#6b5a3e; letter-spacing:1px;
+  }
+  .word i{font-style:normal; color:#c9b28c; font-size:.72em; font-family:"Times New Roman",serif; margin-left:6px}
+  .cta{
+    margin-top:16px; font-size:15px; color:#b3a48f; font-weight:700;
+    display:flex; align-items:center; gap:8px;
+  }
+  .cta .blink{animation:blink 1.5s infinite}
+  @keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+
+  /* ---------- 背面 ---------- */
+  .pic{width:min(62%, 330px); height:auto; display:block}
+  .explain{
+    margin-top:10px; font-size:clamp(17px,4.2vw,23px); font-weight:800; color:#4a4034;
+    text-align:center; line-height:1.5; letter-spacing:.5px;
+  }
+  .explain b{color:var(--orange)}
+  .backchar{
+    position:absolute; top:18px; left:24px; font-size:52px; font-weight:800; color:#efe4cf;
+    font-family:"Kaiti SC","STKaiti",serif; line-height:1;
+  }
+  .backtag{
+    position:absolute; top:22px; right:24px; font-size:13px; font-weight:800; color:#fff;
+    background:var(--green); border-radius:999px; padding:5px 12px; letter-spacing:1px;
+  }
+
+  /* ---------- 按钮 ---------- */
+  .bar{
+    width:100%; max-width:760px; padding:16px 20px calc(22px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;
+  }
+  .btn{
+    border:none; border-radius:22px; font-family:inherit; font-weight:800; cursor:pointer;
+    font-size:17px; padding:15px 22px; color:#fff; background:#c9bda8;
+    box-shadow:0 5px 0 rgba(0,0,0,.14); transition:transform .08s, filter .15s;
+    display:inline-flex; align-items:center; gap:8px; touch-action:manipulation;
+  }
+  .btn:active{transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.14)}
+  .btn.orange{background:var(--orange)} .btn.blue{background:var(--blue)}
+  .btn.green{background:var(--green)}  .btn.pink{background:var(--pink)}
+  .btn.purple{background:var(--purple)}
+  .btn.round{padding:15px 18px; font-size:21px}
+  .btn[disabled]{filter:grayscale(.6) opacity(.55); cursor:default}
+  .hint{width:100%; text-align:center; font-size:12.5px; color:#b6a894; margin-top:2px; letter-spacing:.4px}
+
+  /* ---------- 小彩蛋动画 ---------- */
+  .pop{animation:pop .45s ease}
+  @keyframes pop{0%{transform:scale(1)}35%{transform:scale(1.16)}100%{transform:scale(1)}}
+  .sparkle{position:fixed; pointer-events:none; font-size:26px; animation:fly .9s ease-out forwards; z-index:50}
+  @keyframes fly{0%{opacity:1; transform:translate(-50%,-50%) scale(.6)}
+                 100%{opacity:0; transform:translate(-50%,-140px) scale(1.35)}}
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:rgba(43,43,43,.92); color:#fff; font-size:14px; font-weight:600;
+    padding:11px 18px; border-radius:14px; opacity:0; transition:opacity .3s; z-index:60; pointer-events:none;
+    max-width:86vw; text-align:center;
+  }
+  .toast.show{opacity:1}
+  @media (max-width:420px){
+    .top{padding:12px 14px 4px}
+    .title{font-size:16px}
+    .title small{display:none}
+    .stage{padding:4px 14px 0}
+    .face{border-radius:24px; padding:16px 12px}
+    .words{gap:8px}
+    .word{padding:6px 12px}
+    .cta{font-size:13px; margin-top:12px}
+    .bar{padding:10px 12px calc(14px + env(safe-area-inset-bottom)); gap:8px}
+    .btn{font-size:15px; padding:12px 14px; border-radius:16px; box-shadow:0 4px 0 rgba(0,0,0,.14)}
+    .btn.round{padding:12px 14px; font-size:18px}
+    .btn-say{display:none}
+    .btn-txt{display:none}
+    .cta-text{display:none}
+    .backchar{font-size:40px; top:12px; left:16px}
+    .backtag{top:14px; right:16px; font-size:11.5px; padding:4px 10px}
+    .hint{font-size:11px; padding:0 12px}
+  }
+  @media (max-height:700px){
+    .cta{display:none}
+    .card{max-width:min(640px, 62vh)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .card{transition:none} .blink{animation:none} .pop{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="title">识字卡片 <small>先猜一猜，再翻过来看看</small></div>
+  <div class="counter" id="counter" aria-live="polite">1 / 17</div>
+</div>
+
+<div class="stage">
+  <div class="card" id="card">
+    <div class="face front" id="front">
+      <div class="pinyin" id="pinyin"></div>
+      <div class="big" id="big" title="点一下听读音"></div>
+      <div class="words" id="words"></div>
+      <div class="cta"><span class="blink">👆</span><span class="cta-text">点卡片翻到背面，看看它像什么</span></div>
+    </div>
+    <div class="face back" id="back">
+      <div class="backchar" id="backchar"></div>
+      <div class="backtag">看图画猜字</div>
+      <div id="picbox"></div>
+      <div class="explain" id="explain"></div>
+    </div>
+  </div>
+</div>
+
+<div class="bar">
+  <button class="btn blue round" id="prev" aria-label="上一个">◀</button>
+  <button class="btn orange btn-say" id="speak">🔊 听一听</button>
+  <button class="btn green" id="flip">🔄<span class="btn-txt"> 翻面看图画</span></button>
+  <button class="btn pink" id="speakWords">📣<span class="btn-txt"> 听组词</span></button>
+  <button class="btn blue round" id="next" aria-label="下一个">▶</button>
+  <button class="btn purple" id="shuffle">🎲<span class="btn-txt"> 打乱</span></button>
+</div>
+<div class="hint">空格 = 翻面　·　← → = 上一个 / 下一个　·　R = 再听一遍　·　S = 打乱顺序</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =======================================================================
+   识字卡片：数据区
+   char 汉字 / py 拼音 / words 组词 / pic 内联 SVG 插画 / tip 形象化解释
+   画布统一为 200 × 200
+   ======================================================================= */
+const P = {
+  ink:'#6b5a3e', ink2:'#8c7350', line:'#a98d68',
+  green:'#57c98b', greenD:'#3fae72', pink:'#ff8fa8', pinkD:'#e8617f',
+  red:'#f2704f', redD:'#d9502f', orange:'#ffb03c', orangeD:'#e08c1c',
+  blue:'#5bb8e8', blueD:'#3d9fd4', yellow:'#ffd455', grey:'#b9b1a4',
+  white:'#fffdf7', brown:'#a9713f', brownL:'#d19a5e', brownD:'#8a5a2e', brownDD:'#6b4522',
+  purple:'#9b7bf0'
+};
+const SVG_HEAD = '<svg class="pic" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+const SVG_TAIL = '</svg>';
+const BG = '<rect x="0" y="0" width="200" height="200" rx="26" fill="#fffaf0"/>';
+
+const DATA = [
+  /* ---------------- 日 ---------------- */
+  { char:'日', py:'rì', tone:4, words:[['日出','rì chū'],['日子','rì zi'],['生日','shēng rì']],
+    tip:'日就是<b>太阳</b>，圆圆的、暖洋洋的',
+    pic: BG + `
+      <g stroke="${P.orangeD}" stroke-width="8" stroke-linecap="round">
+        <line x1="100" y1="10" x2="100" y2="26"/>
+        <line x1="100" y1="174" x2="100" y2="190"/>
+        <line x1="10" y1="100" x2="26" y2="100"/>
+        <line x1="174" y1="100" x2="190" y2="100"/>
+        <line x1="33" y1="33" x2="45" y2="45"/>
+        <line x1="155" y1="155" x2="167" y2="167"/>
+        <line x1="167" y1="33" x2="155" y2="45"/>
+        <line x1="45" y1="155" x2="33" y2="167"/>
+      </g>
+      <circle cx="100" cy="100" r="46" fill="${P.yellow}" stroke="${P.orange}" stroke-width="7"/>
+      <circle cx="84" cy="92" r="5" fill="#7a5a20"/>
+      <circle cx="116" cy="92" r="5" fill="#7a5a20"/>
+      <path d="M84 112 q16 16 32 0" stroke="#7a5a20" stroke-width="6" fill="none" stroke-linecap="round"/>` },
+
+  /* ---------------- 月 ---------------- */
+  { char:'月', py:'yuè', tone:4, words:[['月亮','yuè liang'],['月光','yuè guāng'],['月饼','yuè bǐng']],
+    tip:'月就是<b>月亮</b>，晚上挂在天空，弯弯的',
+    pic: BG + `
+      <rect x="0" y="0" width="200" height="200" rx="26" fill="#2f3a5e"/>
+      <circle cx="42" cy="42" r="4" fill="#fff"/><circle cx="62" cy="30" r="3" fill="#ffe9a8"/>
+      <circle cx="160" cy="150" r="3.5" fill="#fff"/><circle cx="32" cy="150" r="3" fill="#ffe9a8"/>
+      <circle cx="120" cy="168" r="2.5" fill="#fff"/><circle cx="178" cy="62" r="2.5" fill="#ffe9a8"/>
+      <path d="M138 44 a60 60 0 0 0 -8 112 a78 78 0 0 1 8 -112 Z" fill="#ffe9a8" stroke="#f0cf7a" stroke-width="5"/>
+      <g stroke="#dfe6ff" stroke-width="5" stroke-linecap="round" opacity=".9">
+        <line x1="46" y1="120" x2="30" y2="140"/><line x1="58" y1="130" x2="42" y2="150"/>
+      </g>` },
+
+  /* ---------------- 山 ---------------- */
+  { char:'山', py:'shān', tone:1, words:[['大山','dà shān'],['山峰','shān fēng'],['爬山','pá shān']],
+    tip:'山就是<b>高高的山峰</b>，三个尖尖连在一起',
+    pic: BG + `
+      <rect x="174" y="34" width="28" height="28" rx="14" fill="${P.orange}"/>
+      <path d="M22 166 L70 74 L118 166 Z" fill="${P.greenD}"/>
+      <path d="M70 74 L86 104 L54 104 Z" fill="${P.white}"/>
+      <path d="M82 166 L134 58 L186 166 Z" fill="${P.green}"/>
+      <path d="M134 58 L152 92 L116 92 Z" fill="${P.white}"/>
+      <path d="M4 166 L42 104 L80 166 Z" fill="#8fd9ae"/>
+      <line x1="6" y1="168" x2="194" y2="168" stroke="${P.greenD}" stroke-width="6" stroke-linecap="round"/>` },
+
+  /* ---------------- 水 ---------------- */
+  { char:'水', py:'shuǐ', tone:3, words:[['喝水','hē shuǐ'],['水果','shuǐ guǒ'],['雨水','yǔ shuǐ']],
+    tip:'水就是<b>会流动的水</b>，中间一条，两边溅开',
+    pic: BG + `
+      <path d="M0 128 q25 -20 50 0 t50 0 t50 0 t50 0 V200 H0 Z" fill="${P.blue}" opacity=".35"/>
+      <path d="M100 22 C120 52 140 68 140 92 a40 40 0 0 1 -80 0 C60 68 80 52 100 22 Z"
+            fill="${P.blue}" stroke="${P.blueD}" stroke-width="5"/>
+      <path d="M88 78 a20 24 0 0 1 12 -20" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/>
+      <path d="M0 152 q25 -20 50 0 t50 0 t50 0 t50 0 V200 H0 Z" fill="${P.blueD}" opacity=".45"/>` },
+
+  /* ---------------- 火 ---------------- */
+  { char:'火', py:'huǒ', tone:3, words:[['火苗','huǒ miáo'],['火车','huǒ chē'],['大火','dà huǒ']],
+    tip:'火就是<b>红红的火焰</b>，往上蹿，很烫',
+    pic: BG + `
+      <path d="M100 24 C132 62 150 86 150 112 a50 50 0 0 1 -100 0 C50 86 68 62 100 24 Z"
+            fill="${P.red}" stroke="${P.redD}" stroke-width="5"/>
+      <path d="M100 70 C116 92 124 100 124 116 a24 24 0 0 1 -48 0 C76 100 84 92 100 70 Z"
+            fill="${P.yellow}" stroke="${P.orange}" stroke-width="4"/>
+      <path d="M100 100 C108 110 110 114 110 122 a10 10 0 0 1 -20 0 C90 114 92 110 100 100 Z" fill="#fff6cc"/>
+      <g stroke="${P.orangeD}" stroke-width="5" stroke-linecap="round">
+        <line x1="40" y1="150" x2="34" y2="170"/><line x1="160" y1="150" x2="166" y2="170"/>
+      </g>` },
+
+  /* ---------------- 人 ---------------- */
+  { char:'人', py:'rén', tone:2, words:[['大人','dà rén'],['人们','rén men'],['人口','rén kǒu']],
+    tip:'人就是<b>站着的人</b>，一撇是腿，一捺是身子',
+    pic: BG + `
+      <path d="M100 114 L82 160" stroke="${P.ink2}" stroke-width="16" stroke-linecap="round"/>
+      <path d="M100 114 L118 160" stroke="${P.ink2}" stroke-width="16" stroke-linecap="round"/>
+      <path d="M74 164 h20 M106 164 h20" stroke="#5a4326" stroke-width="9" stroke-linecap="round"/>
+      <path d="M100 68 V116" stroke="${P.blue}" stroke-width="20" stroke-linecap="round"/>
+      <path d="M100 82 L66 108" stroke="${P.blue}" stroke-width="15" stroke-linecap="round"/>
+      <path d="M100 82 L134 108" stroke="${P.blue}" stroke-width="15" stroke-linecap="round"/>
+      <circle cx="62" cy="112" r="9" fill="#ffdcae" stroke="${P.ink}" stroke-width="3"/>
+      <circle cx="138" cy="112" r="9" fill="#ffdcae" stroke="${P.ink}" stroke-width="3"/>
+      <circle cx="100" cy="46" r="24" fill="#ffdcae" stroke="${P.ink}" stroke-width="4"/>
+      <path d="M76 46 A24 24 0 0 1 124 46 Z" fill="#2b2b2b"/>
+      <circle cx="92" cy="52" r="2.8" fill="#2b2b2b"/><circle cx="108" cy="52" r="2.8" fill="#2b2b2b"/>
+      <path d="M94 60 q6 5 12 0" stroke="#2b2b2b" stroke-width="2.5" fill="none" stroke-linecap="round"/>` },
+
+  /* ---------------- 口 ---------------- */
+  { char:'口', py:'kǒu', tone:3, words:[['开口','kāi kǒu'],['门口','mén kǒu'],['人口','rén kǒu']],
+    tip:'口就是<b>张开的嘴巴</b>，方方的一圈',
+    pic: BG + `
+      <ellipse cx="100" cy="104" rx="58" ry="46" fill="${P.pink}" stroke="${P.pinkD}" stroke-width="6"/>
+      <ellipse cx="100" cy="118" rx="44" ry="30" fill="#8c2b40"/>
+      <path d="M58 92 q42 -22 84 0 q-42 12 -84 0 Z" fill="#fff" stroke="${P.pinkD}" stroke-width="3" stroke-linejoin="round"/>
+      <ellipse cx="100" cy="142" rx="20" ry="10" fill="${P.pink}"/>
+      <g stroke="${P.pinkD}" stroke-width="5" stroke-linecap="round" opacity=".8">
+        <line x1="22" y1="56" x2="8" y2="40"/><line x1="34" y1="40" x2="26" y2="20"/>
+        <line x1="178" y1="56" x2="192" y2="40"/><line x1="166" y1="40" x2="174" y2="20"/>
+      </g>` },
+
+  /* ---------------- 手 ---------------- */
+  { char:'手', py:'shǒu', tone:3, words:[['小手','xiǎo shǒu'],['拍手','pāi shǒu'],['手心','shǒu xīn']],
+    tip:'手就是<b>我们的手</b>，五个手指头',
+    pic: BG + `
+      <g fill="#ffdcae" stroke="${P.ink}" stroke-width="5">
+        <rect x="58" y="32" width="19" height="68" rx="9.5"/>
+        <rect x="80" y="20" width="19" height="80" rx="9.5"/>
+        <rect x="102" y="26" width="19" height="74" rx="9.5"/>
+        <rect x="124" y="42" width="19" height="58" rx="9.5"/>
+      </g>
+      <path d="M64 108 q-28 -8 -34 12 q-4 18 14 22 q16 4 26 -8 Z"
+            fill="#ffdcae" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M56 90 q-8 42 10 60 q10 12 34 12 q24 0 34 -12 q18 -18 10 -60 Z"
+            fill="#ffdcae" stroke="${P.ink}" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M74 122 q18 12 40 0" stroke="#e0b98a" stroke-width="4" fill="none" stroke-linecap="round"/>` },
+
+  /* ---------------- 目 ---------------- */
+  { char:'目', py:'mù', tone:4, words:[['目光','mù guāng'],['耳目','ěr mù'],['目录','mù lù']],
+    tip:'目就是<b>眼睛</b>，古代人的眼睛画成竖着的',
+    pic: BG + `
+      <path d="M18 100 q82 -60 164 0 q-82 60 -164 0 Z" fill="#fff" stroke="${P.ink}" stroke-width="6" stroke-linejoin="round"/>
+      <circle cx="100" cy="100" r="30" fill="${P.brown}"/>
+      <circle cx="100" cy="100" r="14" fill="#2b2b2b"/>
+      <circle cx="90" cy="90" r="7" fill="#fff"/>
+      <g stroke="${P.ink}" stroke-width="6" stroke-linecap="round">
+        <line x1="34" y1="70" x2="24" y2="54"/><line x1="100" y1="58" x2="100" y2="40"/>
+        <line x1="166" y1="70" x2="176" y2="54"/>
+      </g>` },
+
+  /* ---------------- 木 ---------------- */
+  { char:'木', py:'mù', tone:4, words:[['树木','shù mù'],['木头','mù tou'],['木马','mù mǎ']],
+    tip:'木就是<b>一棵树</b>，上面是枝叶，下面是树根',
+    pic: BG + `
+      <path d="M88 166 h24 V70 h-24 Z" fill="${P.brown}"/>
+      <path d="M60 92 L100 58 L140 92 Z" fill="${P.green}" stroke="${P.greenD}" stroke-width="5" stroke-linejoin="round"/>
+      <circle cx="62" cy="84" r="20" fill="${P.green}"/>
+      <circle cx="138" cy="84" r="20" fill="${P.green}"/>
+      <circle cx="100" cy="62" r="24" fill="${P.greenD}"/>
+      <path d="M100 118 L64 146" stroke="${P.brown}" stroke-width="10" stroke-linecap="round"/>
+      <path d="M100 118 L136 146" stroke="${P.brown}" stroke-width="10" stroke-linecap="round"/>
+      <line x1="52" y1="168" x2="148" y2="168" stroke="${P.greenD}" stroke-width="6" stroke-linecap="round"/>` },
+
+  /* ---------------- 鸟 ---------------- */
+  { char:'鸟', py:'niǎo', tone:3, words:[['小鸟','xiǎo niǎo'],['鸟窝','niǎo wō'],['飞鸟','fēi niǎo']],
+    tip:'鸟就是<b>长着翅膀的小鸟</b>，有尖嘴巴和尾巴',
+    pic: BG + `
+      <g stroke="${P.orangeD}" stroke-width="5" stroke-linecap="round">
+        <path d="M90 146 v18"/><path d="M112 146 v18"/>
+        <path d="M82 168 h16"/><path d="M104 168 h16"/>
+      </g>
+      <path d="M136 116 L184 94 L176 126 Z" fill="${P.blueD}" stroke="#2f7ea8" stroke-width="4" stroke-linejoin="round"/>
+      <ellipse cx="100" cy="118" rx="46" ry="34" fill="${P.blue}" stroke="${P.blueD}" stroke-width="4"/>
+      <path d="M94 106 q30 -10 44 14 q-26 20 -46 -2 Z" fill="#a8dcf5" stroke="${P.blueD}" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="72" cy="72" r="28" fill="${P.blue}" stroke="${P.blueD}" stroke-width="4"/>
+      <path d="M74 46 q4 -16 18 -14 q-10 6 -10 16" fill="${P.blueD}"/>
+      <path d="M46 68 L14 78 L46 88 Z" fill="${P.orange}" stroke="${P.orangeD}" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="66" cy="64" r="7.5" fill="#fff"/><circle cx="65" cy="64" r="4" fill="#2b2b2b"/>
+      <circle cx="63" cy="62" r="1.5" fill="#fff"/>` },
+
+  /* ---------------- 鱼 ---------------- */
+  { char:'鱼', py:'yú', tone:2, words:[['小鱼','xiǎo yú'],['金鱼','jīn yú'],['鱼汤','yú tāng']],
+    tip:'鱼就是<b>水里的鱼</b>，有鳞片、尾巴和鳍',
+    pic: BG + `
+      <path d="M0 142 q25 -18 50 0 t50 0 t50 0 t50 0 V200 H0 Z" fill="${P.blue}" opacity=".3"/>
+      <path d="M130 104 L182 74 L176 136 Z" fill="${P.orangeD}" stroke="#c07000" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M88 76 q18 -24 38 -6 q-18 12 -38 6 Z" fill="${P.orange}" stroke="#c07000" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M88 132 q18 24 38 6 q-18 -12 -38 -6 Z" fill="${P.orange}" stroke="#c07000" stroke-width="3" stroke-linejoin="round"/>
+      <ellipse cx="90" cy="104" rx="54" ry="34" fill="${P.orange}" stroke="${P.orangeD}" stroke-width="4"/>
+      <g stroke="#fff" stroke-width="4" fill="none" opacity=".85" stroke-linecap="round">
+        <path d="M70 88 q10 16 0 32"/><path d="M92 84 q10 20 0 40"/><path d="M114 88 q10 16 0 32"/>
+      </g>
+      <circle cx="50" cy="94" r="9" fill="#fff" stroke="${P.orangeD}" stroke-width="3"/>
+      <circle cx="50" cy="94" r="4.5" fill="#2b2b2b"/>
+      <path d="M38 116 q7 6 0 12" stroke="#c07000" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <circle cx="28" cy="70" r="6" fill="none" stroke="${P.blue}" stroke-width="3"/>
+      <circle cx="44" cy="50" r="4" fill="none" stroke="${P.blue}" stroke-width="3"/>` },
+
+  /* ---------------- 马 ---------------- */
+  { char:'马', py:'mǎ', tone:3, words:[['小马','xiǎo mǎ'],['木马','mù mǎ'],['马路','mǎ lù']],
+    tip:'马就是<b>会跑的马</b>，头上有鬃毛，跑得飞快',
+    pic: BG + `
+      <!-- 尾巴 -->
+      <path d="M48 100 C24 92 18 68 30 56 C36 70 40 84 56 92 Z"
+            fill="${P.brownD}" stroke="${P.brownDD}" stroke-width="3" stroke-linejoin="round"/>
+      <!-- 远侧两条腿 -->
+      <path d="M64 132 L56 168" stroke="${P.brown}" stroke-width="12" stroke-linecap="round"/>
+      <path d="M112 134 L114 170" stroke="${P.brown}" stroke-width="12" stroke-linecap="round"/>
+      <path d="M50 170 h12 M108 172 h12" stroke="${P.brownDD}" stroke-width="9" stroke-linecap="round"/>
+      <!-- 脖子 -->
+      <path d="M118 100 L136 52 L166 60 L142 112 Z"
+            fill="${P.brownL}" stroke="${P.brownD}" stroke-width="4" stroke-linejoin="round"/>
+      <!-- 鬃毛 -->
+      <path d="M130 52 L136 24 L150 42 L158 16 L168 44 L178 32 L172 62 L156 56 L142 58 Z" fill="#3a2a1a"/>
+      <!-- 身体 -->
+      <ellipse cx="92" cy="116" rx="48" ry="28" fill="${P.brownL}" stroke="${P.brownD}" stroke-width="4"/>
+      <!-- 近侧两条腿 -->
+      <path d="M84 136 L78 170" stroke="${P.brownL}" stroke-width="12" stroke-linecap="round"/>
+      <path d="M132 132 L140 166" stroke="${P.brownL}" stroke-width="12" stroke-linecap="round"/>
+      <path d="M72 172 h12 M134 168 h12" stroke="${P.brownDD}" stroke-width="9" stroke-linecap="round"/>
+      <!-- 耳朵 -->
+      <path d="M152 42 L146 18 L164 32 Z" fill="${P.brownL}" stroke="${P.brownD}" stroke-width="3" stroke-linejoin="round"/>
+      <!-- 头 -->
+      <ellipse cx="164" cy="62" rx="24" ry="16" transform="rotate(-16 164 62)"
+               fill="${P.brownL}" stroke="${P.brownD}" stroke-width="4"/>
+      <!-- 口鼻 -->
+      <ellipse cx="184" cy="56" rx="11" ry="9" fill="#e8b77e" stroke="${P.brownD}" stroke-width="3"/>
+      <circle cx="189" cy="53" r="2.2" fill="${P.brownDD}"/>
+      <!-- 眼睛 -->
+      <circle cx="160" cy="54" r="4.5" fill="#fff"/><circle cx="161" cy="54" r="2.4" fill="#2b2b2b"/>` },
+
+  /* ---------------- 牛 ---------------- */
+  { char:'牛', py:'niú', tone:2, words:[['小牛','xiǎo niú'],['牛奶','niú nǎi'],['水牛','shuǐ niú']],
+    tip:'牛就是<b>头上有两只角的牛</b>，会产牛奶',
+    pic: BG + `
+      <path d="M156 104 q22 12 14 34" stroke="#c9c4bc" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <circle cx="169" cy="142" r="6" fill="#3a3a3a"/>
+      <path d="M78 140 L74 172" stroke="#c9c4bc" stroke-width="13" stroke-linecap="round"/>
+      <path d="M124 140 L126 172" stroke="#c9c4bc" stroke-width="13" stroke-linecap="round"/>
+      <path d="M68 174 h12 M120 174 h12" stroke="#3a3a3a" stroke-width="8" stroke-linecap="round"/>
+      <ellipse cx="106" cy="118" rx="52" ry="32" fill="#fffdf7" stroke="#3a3a3a" stroke-width="4"/>
+      <ellipse cx="92" cy="108" rx="15" ry="11" fill="#3a3a3a" opacity=".9"/>
+      <ellipse cx="136" cy="126" rx="11" ry="8" fill="#3a3a3a" opacity=".9"/>
+      <path d="M98 142 L96 174" stroke="#fffdf7" stroke-width="13" stroke-linecap="round"/>
+      <path d="M142 140 L146 172" stroke="#fffdf7" stroke-width="13" stroke-linecap="round"/>
+      <path d="M90 176 h12 M140 174 h12" stroke="#3a3a3a" stroke-width="8" stroke-linecap="round"/>
+      <path d="M38 64 q-16 -12 -8 -26" stroke="#d9d4c8" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <path d="M74 64 q16 -12 8 -26" stroke="#d9d4c8" stroke-width="9" fill="none" stroke-linecap="round"/>
+      <ellipse cx="26" cy="80" rx="13" ry="8" transform="rotate(-25 26 80)" fill="#f7d9d9" stroke="#3a3a3a" stroke-width="3"/>
+      <ellipse cx="86" cy="80" rx="13" ry="8" transform="rotate(25 86 80)" fill="#f7d9d9" stroke="#3a3a3a" stroke-width="3"/>
+      <ellipse cx="56" cy="88" rx="30" ry="28" fill="#fffdf7" stroke="#3a3a3a" stroke-width="4"/>
+      <circle cx="46" cy="84" r="4.5" fill="#2b2b2b"/>
+      <circle cx="68" cy="84" r="4.5" fill="#2b2b2b"/>
+      <ellipse cx="56" cy="108" rx="17" ry="12" fill="#ffc9c9" stroke="#e08c8c" stroke-width="3"/>
+      <circle cx="50" cy="106" r="3" fill="#c97070"/><circle cx="62" cy="106" r="3" fill="#c97070"/>` },
+
+  /* ---------------- 羊 ---------------- */
+  { char:'羊', py:'yáng', tone:2, words:[['小羊','xiǎo yáng'],['山羊','shān yáng'],['羊毛','yáng máo']],
+    tip:'羊就是<b>毛卷卷的羊</b>，头上两只角弯弯的',
+    pic: BG + `
+      <path d="M80 146 L76 174" stroke="#8a8a8a" stroke-width="11" stroke-linecap="round"/>
+      <path d="M124 146 L128 174" stroke="#8a8a8a" stroke-width="11" stroke-linecap="round"/>
+      <path d="M100 150 L98 178" stroke="#5a5a5a" stroke-width="11" stroke-linecap="round"/>
+      <path d="M142 148 L146 176" stroke="#5a5a5a" stroke-width="11" stroke-linecap="round"/>
+      <g fill="#fffdf7" stroke="#c9c4bc" stroke-width="4">
+        <circle cx="80" cy="114" r="22"/>
+        <circle cx="112" cy="100" r="24"/>
+        <circle cx="144" cy="114" r="22"/>
+        <circle cx="96" cy="136" r="20"/>
+        <circle cx="130" cy="136" r="20"/>
+        <circle cx="112" cy="118" r="26"/>
+      </g>
+      <path d="M42 70 q-20 -8 -16 -26 q18 2 22 16" fill="#efe6d4" stroke="#b9b1a4" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M66 70 q20 -8 16 -26 q-18 2 -22 16" fill="#efe6d4" stroke="#b9b1a4" stroke-width="4" stroke-linejoin="round"/>
+      <ellipse cx="26" cy="98" rx="11" ry="7" transform="rotate(-20 26 98)" fill="#3a3a3a"/>
+      <ellipse cx="78" cy="98" rx="11" ry="7" transform="rotate(20 78 98)" fill="#3a3a3a"/>
+      <ellipse cx="52" cy="94" rx="24" ry="26" fill="#3a3a3a"/>
+      <circle cx="44" cy="90" r="4" fill="#fffdf7"/><circle cx="62" cy="90" r="4" fill="#fffdf7"/>
+      <circle cx="44" cy="90" r="2" fill="#2b2b2b"/><circle cx="62" cy="90" r="2" fill="#2b2b2b"/>
+      <ellipse cx="52" cy="112" rx="9" ry="6" fill="#c9c4bc"/>` },
+
+  /* ---------------- 雨 ---------------- */
+  { char:'雨', py:'yǔ', tone:3, words:[['下雨','xià yǔ'],['雨伞','yǔ sǎn'],['雨点','yǔ diǎn']],
+    tip:'雨就是<b>从云里落下来的雨点</b>，一滴一滴',
+    pic: BG + `
+      <rect x="0" y="0" width="200" height="200" rx="26" fill="#e8f4ff"/>
+      <path d="M52 92 a30 30 0 0 1 30 -30 a34 34 0 0 1 62 12 a24 24 0 0 1 -6 46 H74 a28 28 0 0 1 -22 -28 Z"
+            fill="${P.grey}" stroke="#9aa4ae" stroke-width="5"/>
+      <g fill="${P.blue}" opacity=".95">
+        <path d="M66 124 q8 14 0 20 q-8 -6 0 -20 Z"/>
+        <path d="M100 132 q8 14 0 20 q-8 -6 0 -20 Z"/>
+        <path d="M134 124 q8 14 0 20 q-8 -6 0 -20 Z"/>
+        <path d="M82 158 q8 14 0 20 q-8 -6 0 -20 Z"/>
+        <path d="M118 158 q8 14 0 20 q-8 -6 0 -20 Z"/>
+      </g>
+      <path d="M20 172 q20 -14 40 0 t40 0" stroke="${P.blueD}" stroke-width="5" fill="none" stroke-linecap="round" opacity=".6"/>` },
+
+  /* ---------------- 花 ---------------- */
+  { char:'花', py:'huā', tone:1, words:[['花朵','huā duǒ'],['开花','kāi huā'],['红花','hóng huā']],
+    tip:'花就是<b>开在草里的花朵</b>，有花瓣和绿叶',
+    pic: BG + `
+      <path d="M0 176 q30 -22 60 0 t60 0 t60 0 V200 H0 Z" fill="${P.green}" opacity=".4"/>
+      <line x1="100" y1="108" x2="100" y2="176" stroke="${P.greenD}" stroke-width="8" stroke-linecap="round"/>
+      <path d="M100 144 q-30 -6 -34 -26 q28 -4 34 26 Z" fill="${P.green}" stroke="${P.greenD}" stroke-width="4"/>
+      <path d="M100 158 q30 -6 34 -26 q-28 -4 -34 26 Z" fill="${P.green}" stroke="${P.greenD}" stroke-width="4"/>
+      <g fill="${P.pink}" stroke="${P.pinkD}" stroke-width="4">
+        <circle cx="100" cy="52" r="21"/><circle cx="68" cy="82" r="21"/>
+        <circle cx="132" cy="82" r="21"/><circle cx="82" cy="114" r="21"/><circle cx="118" cy="114" r="21"/>
+      </g>
+      <circle cx="100" cy="88" r="18" fill="${P.yellow}" stroke="${P.orange}" stroke-width="4"/>` }
+];
+
+/* =======================================================================
+   游戏逻辑
+   ======================================================================= */
+const $ = id => document.getElementById(id);
+const card     = $('card');
+const elBig    = $('big');
+const elPinyin = $('pinyin');
+const elWords  = $('words');
+const elPic    = $('picbox');
+const elExplain= $('explain');
+const elBackChar = $('backchar');
+const elCounter= $('counter');
+const toast    = $('toast');
+const flipBtn  = $('flip');
+
+let order = DATA.map((_, i) => i);
+let pos = 0;
+let flipped = false;
+const cur = () => DATA[order[pos]];
+
+/* ---------------- 语音 ---------------- */
+let zhVoice = null;
+const speechOK = ('speechSynthesis' in window) && (typeof SpeechSynthesisUtterance === 'function');
+let speakToken = 0;
+
+function pickVoice() {
+  if (!speechOK) return;
+  const vs = speechSynthesis.getVoices() || [];
+  if (!vs.length) return;
+  const zh = vs.filter(v => /zh|cmn|Chinese|中文|普通话/i.test(v.lang + ' ' + v.name));
+  zhVoice =
+    zh.find(v => /Tingting|婷婷|Meijia|美佳|Xiaoxiao|晓晓|PingFang|Google 普通话|Chinese \(China\)|zh-CN/i.test(v.name + ' ' + v.lang)) ||
+    zh[0] || null;
+}
+if (speechOK) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+function say(text, opts = {}) {
+  if (!speechOK) { showToast('这个浏览器不支持朗读，换 Chrome / Safari / 微信试试'); return; }
+  const token = ++speakToken;
+  try { speechSynthesis.cancel(); } catch (_) {}
+  setTimeout(() => {
+    if (token !== speakToken) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'zh-CN';
+      if (zhVoice) u.voice = zhVoice;
+      u.rate   = opts.rate   ?? 0.82;
+      u.pitch  = opts.pitch  ?? 1.1;
+      u.volume = 1;
+      u.onerror = () => {};
+      speechSynthesis.speak(u);
+    } catch (e) {
+      showToast('朗读失败：' + e.message);
+    }
+  }, 60);
+}
+const sayChar  = () => say(cur().char, { rate: 0.72, pitch: 1.15 });
+const sayWords = () => say(cur().words.map(w => w[0]).join('，'), { rate: 0.85 });
+
+/* ---------------- 提示条 ---------------- */
+let toastTimer = null;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+/* ---------------- 渲染 ---------------- */
+function render(animate) {
+  const d = cur();
+  elPinyin.textContent = d.py;
+  elBig.textContent    = d.char;
+  elWords.innerHTML    = d.words.map(([w, p]) => `<span class="word">${w}<i>${p}</i></span>`).join('');
+  elPic.innerHTML      = SVG_HEAD + d.pic + SVG_TAIL;
+  elExplain.innerHTML  = d.tip;
+  elBackChar.textContent = d.char;
+  elCounter.textContent  = `${pos + 1} / ${order.length}`;
+  if (animate) {
+    elBig.classList.remove('pop');
+    void elBig.offsetWidth;
+    elBig.classList.add('pop');
+  }
+}
+
+function setFlip(v) {
+  flipped = !!v;
+  card.classList.toggle('flipped', flipped);
+  flipBtn.innerHTML = flipped
+    ? '🔄<span class="btn-txt"> 翻回正面</span>'
+    : '🔄<span class="btn-txt"> 翻面看图画</span>';
+  if (flipped) sayChar();
+}
+
+function toggleFlip() {
+  setFlip(!flipped);
+  if (flipped) sparkle();
+}
+
+function sparkle() {
+  const box = card.getBoundingClientRect();
+  const chars = ['⭐', '✨', '🌟', '💫', '🎉'];
+  for (let i = 0; i < 5; i++) {
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    s.textContent = chars[(Math.random() * chars.length) | 0];
+    s.style.left = (box.left + box.width  * (0.25 + Math.random() * 0.5)) + 'px';
+    s.style.top  = (box.top  + box.height * (0.35 + Math.random() * 0.3)) + 'px';
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 950);
+  }
+}
+
+function go(step) {
+  pos = (pos + step + order.length) % order.length;
+  setFlip(false);
+  render(true);
+  sayChar();
+}
+
+/* ---------------- 事件 ---------------- */
+card.addEventListener('click', toggleFlip);
+
+elBig.addEventListener('click', e => {
+  e.stopPropagation();
+  sayChar();
+  elBig.classList.remove('pop');
+  void elBig.offsetWidth;
+  elBig.classList.add('pop');
+});
+
+flipBtn.addEventListener('click', toggleFlip);
+$('speak').addEventListener('click', sayChar);
+$('speakWords').addEventListener('click', sayWords);
+$('prev').addEventListener('click', () => go(-1));
+$('next').addEventListener('click', () => go(1));
+
+$('shuffle').addEventListener('click', () => {
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  pos = 0;
+  setFlip(false);
+  render(true);
+  showToast('顺序已打乱 🎲');
+});
+
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'button' || tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleFlip(); }
+  else if (e.key === 'ArrowRight') go(1);
+  else if (e.key === 'ArrowLeft')  go(-1);
+  else if (e.key.toLowerCase() === 'r') sayChar();
+  else if (e.key.toLowerCase() === 's') $('shuffle').click();
+});
+
+/* ---------------- 启动 ---------------- */
+render(false);
+setFlip(false);
+
+document.addEventListener('pointerdown', function once() {
+  document.removeEventListener('pointerdown', once);
+  if (speechOK) pickVoice();
+}, { once: true });
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && speechOK) { try { speechSynthesis.resume(); } catch (_) {} }
+});
+</script>
+</body>
+</html>
