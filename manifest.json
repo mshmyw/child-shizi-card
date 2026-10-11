@@ -1,13 +1,34 @@
 {
-  "name": "识字卡片",
-  "short_name": "识字",
-  "description": "儿童识字猜字游戏",
+  "name": "识字卡片 · 猜猜这是什么字",
+  "short_name": "识字卡片",
+  "description": "儿童识字猜字游戏：32 个汉字，图形化解释、语音朗读、护眼底色，可离线使用。",
+  "lang": "zh-CN",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#fdf7ec",
-  "theme_color": "#ff9a3c",
+  "orientation": "portrait",
+  "background_color": "#fbf4e6",
+  "theme_color": "#fbf4e6",
   "icons": [
-    { "src": "icon.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-narrow.png",
+      "sizes": "540x544",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
   ]
 }
