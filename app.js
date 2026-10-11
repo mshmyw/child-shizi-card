@@ -16,6 +16,7 @@
      ======================================================================= */
   const $ = id => document.getElementById(id);
   const card = $('card');
+  const swipeEl = $('swipe');   // 专门负责横向位移/透明度的外层
   const elBig = $('big'), elWords = $('words');
   const elPic = $('picbox'), elExplain = $('explain'), elBackChar = $('backchar');
   const toast = $('toast');
@@ -447,21 +448,27 @@
   }
 
   /* ---------------- 左右滑动切换卡片（手机上主要靠这个） ---------------- */
-  const SLIDE = 280;                     // 滑出动画时长，与 CSS 中的数值保持一致
   const threshold = () => Math.max(52, card.getBoundingClientRect().width * 0.18);
 
   function bindSwipe() {
     let active = false, decided = false, horiz = false;
     let sx = 0, sy = 0, dx = 0, t0 = 0, isSwipe = false;
-    let swipedAt = 0;
-    let pid = null;          // 只认第一根手指，否则小孩多指点屏幕会误翻
+    let pid = null;              // 只认第一根手指，否则小孩多指点屏幕会误翻
 
-    const clearMove = () => {
-      card.style.setProperty('--dx', '0px');
-      card.style.setProperty('--ds', '1');
-      card.style.setProperty('--dop', '1');
+    const setMove = (px, opacity) => {
+      swipeEl.style.transform = 'translateX(' + Math.round(px) + 'px)';
+      if (opacity !== undefined) swipeEl.style.opacity = String(opacity);
     };
-    const releaseAfter = ms => setTimeout(() => { card.style.transition = ''; }, ms);
+    const springBack = () => {                 // 回弹
+      swipeEl.classList.remove('leaving', 'entering');
+      swipeEl.classList.add('spring');
+      setMove(0, 1);
+      setTimeout(() => {
+        swipeEl.classList.remove('spring');
+        swipeEl.style.transform = '';
+        swipeEl.style.opacity = '';
+      }, 340);
+    };
 
     card.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;   // 只响应主键
@@ -477,49 +484,54 @@
         if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;      // 位移太小，先不判断
         decided = true;
         horiz = Math.abs(mx) > Math.abs(my) * 1.2;             // 以横向为主才算滑动
-        // 这里刻意不调用 setPointerCapture：
-        // 触摸指针本身就有"隐式捕获"（事件始终发给 pointerdown 的那个元素），
+        // 刻意不调用 setPointerCapture：触摸指针本来就有隐式捕获，
         // 再显式捕获一次，浏览器会立刻补发 lostpointercapture 把手势打断。
         // 鼠标拖出卡片的情况由 window 上的 pointerup 兜底。
+        if (horiz) {
+          swipeEl.classList.remove('leaving', 'entering', 'spring');
+          swipeEl.style.transform = 'translateX(0px)';         // 清掉遗留值再跟手
+        }
       }
       if (!horiz) return;                                      // 纵向滑动 → 交给页面滚动
       dx = mx;
       const cap = threshold() * 2.2;
       if (Math.abs(dx) > cap) dx = Math.sign(dx) * (cap + (Math.abs(dx) - cap) * 0.35);   // 橡皮筋阻尼
-      card.style.setProperty('--dx', dx.toFixed(1) + 'px');
-      card.style.setProperty('--ds', (1 - Math.min(Math.abs(dx) / 2400, 0.05)).toFixed(3));
+      setMove(dx);
     });
 
     const end = e => {
       if (!active) return;
       if (e && e.pointerId !== undefined && e.pointerId !== pid) return;
       active = false; pid = null;
-      if (!horiz) return;
+      if (!horiz) { dx = 0; return; }
+
       const quick = (Date.now() - t0) < 320 && Math.abs(dx) > 26;   // 快速轻扫也算数
       if (Math.abs(dx) > threshold() || quick) {
         isSwipe = true;
-        swipedAt = Date.now();
-        const dir  = dx < 0 ? 1 : -1;      // 翻页方向：往左滑 = 下一张
-        const exit = Math.sign(dx) || 1;   // 退出方向：必须跟着手指走，不能复用 dir
-        const w = card.getBoundingClientRect().width;
-        card.classList.add('slide-out');
-        card.style.setProperty('--dx', (exit * w * 1.05) + 'px');   // 顺着手指方向滑出去
-        card.style.setProperty('--ds', '0.96');
-        card.style.setProperty('--dop', '0');                       // 边滑边淡出，收尾更干净
+        const dir  = dx < 0 ? 1 : -1;        // 翻页方向：往左滑 = 下一张
+        const exit = Math.sign(dx) || 1;     // 退出方向：必须跟着手指，不能复用 dir
+        const w = swipeEl.getBoundingClientRect().width;
+        swipeEl.classList.remove('spring', 'entering');
+        swipeEl.classList.add('leaving');
+        setMove(exit * w * 1.02, 0);         // 顺着手指滑出去并淡出
+
         setTimeout(() => {
-          go(dir);
-          card.style.transition = 'none';                           // 无过渡地"瞬移"到入场位置
-          card.style.setProperty('--dx', (-exit * 52) + 'px');
-          card.style.setProperty('--ds', '0.97');
-          void card.offsetWidth;                                    // 强制重排，确保瞬移生效且不被看见
-          card.classList.remove('slide-out');                       // 交还给 CSS 的入场过渡
-          clearMove();                                              // --dx/--ds/--dop 过渡回原位
-          setTimeout(() => { card.style.transition = ''; }, SLIDE + 60);
+          go(dir);                            // 换卡片（安静翻页）
+          swipeEl.classList.remove('leaving');
+          swipeEl.style.transition = 'none';
+          setMove(-exit * 46, 0);             // 无过渡地落到另一侧
+          void swipeEl.offsetWidth;           // 强制重排，确保这一帧不被看见
+          swipeEl.style.transition = '';
+          swipeEl.classList.add('entering');
+          setMove(0, 1);                      // 平滑滑入
+          setTimeout(() => {
+            swipeEl.classList.remove('entering');
+            swipeEl.style.transform = '';
+            swipeEl.style.opacity = '';
+          }, 360);
         }, 240);
       } else {
-        card.style.transition = 'transform ' + SLIDE + 'ms cubic-bezier(.2,.9,.3,1), opacity .2s ease';
-        clearMove();
-        releaseAfter(SLIDE + 40);
+        springBack();
       }
       dx = 0;
     };
