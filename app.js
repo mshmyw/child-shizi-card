@@ -233,9 +233,11 @@
   });
 
   /* ---------------- 轻音效（纯代码合成，不需要任何音频文件） ---------------- */
-  const SFX_KEY = 'hanzi-sfx';
+  const SFX_KEY = 'hanzi-sfx';            // 沿用原来的键，老用户的设置不会丢
   let sfxCtx = null;
-  let sfxOn = store.get(SFX_KEY) !== 'off';
+  /* 一个开关管住"所有声音"：提示音（Web Audio）+ 语音朗读（speechSynthesis）。
+     原来只关了提示音，语音照样读，看起来就像开关没生效。 */
+  let audioOn = store.get(SFX_KEY) !== 'off';
 
   function sfxInit() {
     if (sfxCtx) return sfxCtx;
@@ -260,25 +262,25 @@
     osc.start(t0); osc.stop(t0 + dur + 0.02);
   }
   const sfx = {
-    tap()  { if (sfxOn) tone(680, 0.09, 0, 0.035); },                   // 翻页：极轻
-    flip() { if (sfxOn) { tone(520, 0.14, 0, 0.05); tone(780, 0.18, 0.05, 0.04); } },  // 翻面
-    right(){ if (sfxOn) { tone(784, 0.16, 0, 0.05); tone(1046, 0.22, 0.08, 0.045); } },// 揭晓
-    whoosh(){ if (sfxOn) tone(300, 0.22, 0, 0.04); },                   // 打乱
+    tap()  { if (audioOn) tone(680, 0.09, 0, 0.035); },                   // 翻页：极轻
+    flip() { if (audioOn) { tone(520, 0.14, 0, 0.05); tone(780, 0.18, 0.05, 0.04); } },  // 翻面
+    right(){ if (audioOn) { tone(784, 0.16, 0, 0.05); tone(1046, 0.22, 0.08, 0.045); } },// 揭晓
+    whoosh(){ if (audioOn) tone(300, 0.22, 0, 0.04); },                   // 打乱
   };
   const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
 
   function syncSfxBtn() {
     const b = $('sfxBtn');
-    b.textContent = sfxOn ? '🔔' : '🔕';
-    b.title = sfxOn ? '音效已开，点一下静音' : '音效已静音，点一下打开';
+    b.textContent = audioOn ? '🔔' : '🔕';
+    b.title = audioOn ? '声音已开（提示音 + 朗读），点一下静音' : '已静音（提示音 + 朗读都关），点一下打开';
     b.setAttribute('aria-label', b.title);
   }
   $('sfxBtn').addEventListener('click', () => {
-    sfxOn = !sfxOn;
-    store.set(SFX_KEY, sfxOn ? 'on' : 'off');
+    audioOn = !audioOn;
+    store.set(SFX_KEY, audioOn ? 'on' : 'off');
     syncSfxBtn();
-    if (sfxOn) { sfxInit(); sfx.flip(); }
-    showToast(sfxOn ? '音效打开 🔔' : '音效关闭 🔕');
+    if (audioOn) { sfxInit(); sfx.flip(); showToast('声音打开 🔔'); }
+    else { stopSpeech(); showToast('已静音：提示音和朗读都关了 🔕', 2800); }
   });
 
   /* ---------------- 卡片跟随手指的轻微倾斜 ---------------- */
@@ -319,11 +321,13 @@
      换卡片/切分类/关抽屉时都要调用——否则上一张的解释会被兜底定时器念出来。 */
   function stopSpeech() {
     speakSeq++;
+    // 注意：这个不加 audioOn 判断——关声音时要能立刻打断正在播放的朗读
     try { if (speechOK) speechSynthesis.cancel(); } catch (e) {}
   }
 
   function say(text, opts = {}) {
     speakSeq++;
+    if (!audioOn) return;                    // 总开关关了就一个字也不读
     if (!speechOK) { showToast('这个浏览器不支持朗读，可以换成 Chrome / Safari 试试'); return; }
     try {
       speechSynthesis.cancel();
@@ -338,6 +342,7 @@
 
   /* 连着念两段：把第二段挂在第一段的 onend 上，避免被 cancel 掉或抢着一起念 */
   function sayClick(first, second) {
+    if (!audioOn) return;                    // 总开关关了就一个字也不读
     if (!speechOK) { showToast('这个浏览器不支持朗读，可以换成 Chrome / Safari 试试'); return; }
     try {
       speechSynthesis.cancel();
@@ -387,10 +392,10 @@
   function adaptHint() {
     const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     const touchLike = coarse || window.innerWidth <= 560;
+    // 卡片内的短提示：触摸端强调"滑动"，电脑端说"点卡片"
     const t = document.querySelector('.cta-text');
-    if (t) t.textContent = touchLike
-      ? '左右滑动换一张 · 点卡片看图画'
-      : '点卡片翻到背面，看看它像什么';
+    if (t) t.textContent = touchLike ? '点卡片空白处看图画' : '点卡片翻到背面，看看它像什么';
+    // 卡片外那行用法说明的显隐交给 CSS 媒体查询（这里不再写 inline style，免得打架）
   }
   let hintTimer = 0;
   window.addEventListener('resize', () => {
@@ -572,16 +577,13 @@
   }
 
   /* ---------------- 事件 ---------------- */
-  // 翻面：补发的 click 已由上面的捕获阶段拦掉，这里不再需要时间窗
+  /* 卡片只有一个功能：点哪都翻面。
+     原来"点大字=朗读、点其它=翻面"，但大字的行盒比可见字形高出一截，
+     贴着字上方/下方点会被判成"点字"，既不像翻面也不像朗读，
+     让人完全摸不清触发点在哪。现在朗读交给专门的按钮（正面「听一听」/ 背面「读解释」）。 */
   card.addEventListener('click', () => {
     setFlip(!flipped);
     if (flipped) sparkle();
-  });
-  elBig.addEventListener('click', e => {
-    e.stopPropagation();
-    sfx.tap(); buzz(12);
-    sayChar();
-    elBig.classList.remove('pop'); void elBig.offsetWidth; elBig.classList.add('pop');
   });
   $('flip').addEventListener('click', () => { setFlip(!flipped); if (flipped) sparkle(); });
   // 正面：读汉字 + 组词；背面：读那幅图画的解释
@@ -661,7 +663,8 @@
   }
 
   initTheme();
-  syncSfxBtn();
+  syncSfxBtn();          // 若上次是静音，按钮要直接显示 🔕（语音也已由 say() 拦住）
+
   adaptHint();
   bindTilt();
   bindSwipe();
