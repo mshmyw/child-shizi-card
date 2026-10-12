@@ -325,50 +325,43 @@
     try { if (speechOK) speechSynthesis.cancel(); } catch (e) {}
   }
 
-  function say(text, opts = {}) {
-    speakSeq++;
-    if (!audioOn) return;                    // 总开关关了就一个字也不读
-    if (!speechOK) { showToast('这个浏览器不支持朗读，可以换成 Chrome / Safari 试试'); return; }
+
+  /* 按顺序朗读多段：把后一段挂在前一段的 onend 上。
+     两个坑：
+       ① 有些浏览器（iOS Safari）onend 不一定触发，所以每段都带超时兜底；
+       ② 快速切卡/静音时，旧回调必须作废，否则会念出上一张的内容 —— 用序号令牌。 */
+  function speakQueue(parts) {
+    if (!audioOn || !speechOK || !parts.length) return;
     try {
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'zh-CN';
-      if (zhVoice) u.voice = zhVoice;
-      u.rate = opts.rate ?? 0.8;
-      u.pitch = opts.pitch ?? 1.1;
-      speechSynthesis.speak(u);
+      const mySeq = ++speakSeq;
+      let i = 0;
+      const next = () => {
+        if (i >= parts.length || mySeq !== speakSeq) return;
+        const p = parts[i++];
+        const u = new SpeechSynthesisUtterance(p.text);
+        u.lang = 'zh-CN';
+        if (zhVoice) u.voice = zhVoice;
+        u.rate = p.rate || 0.8;
+        u.pitch = p.pitch || 1.12;
+        let done = false;
+        const go = () => { if (done || mySeq !== speakSeq) return; done = true; next(); };
+        u.onend = go;
+        u.onerror = go;
+        setTimeout(go, Math.max(1600, p.text.length * 620));
+        speechSynthesis.speak(u);
+      };
+      next();
     } catch (err) { showToast('朗读失败：' + err.message); }
   }
 
-  /* 连着念两段：把第二段挂在第一段的 onend 上，避免被 cancel 掉或抢着一起念 */
-  function sayClick(first, second) {
-    if (!audioOn) return;                    // 总开关关了就一个字也不读
-    if (!speechOK) { showToast('这个浏览器不支持朗读，可以换成 Chrome / Safari 试试'); return; }
-    try {
-      speechSynthesis.cancel();
-      const a = new SpeechSynthesisUtterance(first);
-      a.lang = 'zh-CN'; if (zhVoice) a.voice = zhVoice;
-      a.rate = 0.72; a.pitch = 1.15;
-      const b = new SpeechSynthesisUtterance(second);
-      b.lang = 'zh-CN'; if (zhVoice) b.voice = zhVoice;
-      b.rate = 0.82; b.pitch = 1.12;
-      // iOS Safari 上 onend 有时不触发，加一个超时兜底，否则第二段永远读不出来。
-      // 同时用序号令牌把过时的回调作废，避免快速切卡后念出上一张的内容。
-      const mySeq = ++speakSeq;
-      let said = false;
-      const saySecond = () => {
-        if (said || mySeq !== speakSeq) return;
-        said = true;
-        try { speechSynthesis.speak(b); } catch (e) {}
-      };
-      a.onend = saySecond;
-      a.onerror = saySecond;
-      setTimeout(saySecond, Math.max(1800, first.length * 620));
-      speechSynthesis.speak(a);
-    } catch (err) { showToast('朗读失败：' + err.message); }
-  }
-  const sayChar  = () => say(cur().char, { rate: 0.72, pitch: 1.15 });
-  const sayWords = () => say(cur().words.join('，'), { rate: 0.85 });
+  /* 一次读完：字 → 组词 → 背面解释（背面的解释句本来就是看图说话） */
+  const readAll = () => speakQueue([
+    { text: cur().char, rate: 0.72, pitch: 1.16 },
+    { text: cur().words.join('，'), rate: 0.85 },
+    { text: tipText(cur()), rate: 0.82 },
+  ]);
+
 
   /* 把背面的解释句念出来。
      tip 里带 <b> 高亮标签，要去掉；顿号「、」在语音里会变成很明显的小停顿，
@@ -376,7 +369,6 @@
   function tipText(d) {
     return d.tip.replace(/<[^>]+>/g, '').replace(/、/g, '，').replace(/。$/, '');
   }
-  const sayExplain = () => say(tipText(cur()), { rate: 0.82, pitch: 1.12 });
 
   /* ---------------- 提示 ---------------- */
   let toastTimer = null;
@@ -424,15 +416,11 @@
     $('flip').innerHTML = flipped
       ? '🔄<span class="btn-txt"> 翻回正面</span>'
       : '🔄<span class="btn-txt"> 翻面看图画</span>';
-    // 背面时这个按钮改成「读解释」，正面时读汉字和组词
-    $('speak').innerHTML = flipped
-      ? '💬<span class="btn-txt"> 读解释</span>'
-      : '🔊<span class="btn-txt"> 听一听</span>';
     if (flipped) {
       sfx.right();                   // 揭晓的小铃声
       buzz(18);
       // 先报字，再把画面解释念一遍（翻页仍然完全不发音）
-      sayClick(cur().char, tipText(cur()));
+      readAll();                    // 字 → 组词 → 解释，翻过来就能听完整的一遍
     } else {
       sfx.tap();
     }
@@ -586,19 +574,8 @@
     if (flipped) sparkle();
   });
   $('flip').addEventListener('click', () => { setFlip(!flipped); if (flipped) sparkle(); });
-  // 正面：读汉字 + 组词；背面：读那幅图画的解释
-  $('speak').addEventListener('click', () => {
-    if (flipped) { sfx.tap(); sayExplain(); return; }
-    sfx.tap();
-    const d = cur();                                 // 先抓住这张卡，别等定时器再取
-    sayChar();
-    setTimeout(() => {
-      // 这 900ms 里换过卡就不能再读了，否则会念出新卡的组词、还会掐断新卡的朗读
-      if (cur() !== d) return;
-      say(d.words.join('，'), { rate: 0.85 });
-    }, 900);
-  });
-  $('speakWords').addEventListener('click', sayWords);
+  // 一个按钮读完整的一遍：字 → 组词 → 解释（正反面都一样，不用分辨现在在哪一面）
+  $('speak').addEventListener('click', () => { sfx.tap(); buzz(12); readAll(); });
   $('prev').addEventListener('click', () => go(-1));
   $('next').addEventListener('click', () => go(1));
   $('shuffle').addEventListener('click', () => {
@@ -622,7 +599,7 @@
     if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setFlip(!flipped); if (flipped) sparkle(); }
     else if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
-    else if (e.key.toLowerCase() === 'r') sayChar();
+    else if (e.key.toLowerCase() === 'r') readAll();
     else if (e.key.toLowerCase() === 's') $('shuffle').click();
   });
 
@@ -663,7 +640,7 @@
   }
 
   initTheme();
-  syncSfxBtn();          // 若上次是静音，按钮要直接显示 🔕（语音也已由 say() 拦住）
+  syncSfxBtn();          // 若上次是静音，按钮直接显示 🔕（朗读也由 audioOn 统一拦住）
 
   adaptHint();
   bindTilt();
