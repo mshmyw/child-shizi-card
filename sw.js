@@ -4,7 +4,7 @@
  * 注意：全部使用相对路径，这样部署到 GitHub Pages 的子路径（/仓库名/）也正常。
  */
 
-const CACHE = 'hanzi-cards-v12';   // 改动资源后把版本号 +1 即可刷新缓存
+const CACHE = 'hanzi-cards-v13';   // 改动资源后把版本号 +1 即可刷新缓存
 
 /* 需要预缓存的资源：尽量小，避免首次安装太慢 */
 const CORE = [
